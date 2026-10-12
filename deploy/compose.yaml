@@ -1,0 +1,17 @@
+# docker-manager on the server: /root/apps/docker-manager/compose.yaml (deploy/deploy.sh puts it there).
+services:
+  docker-manager:
+    image: docker-manager:latest
+    container_name: docker-manager
+    restart: unless-stopped
+    ports:
+      - "8090:8080"                     # your reverse proxy targets <server>:8090
+    volumes:
+      - ./config.yaml:/etc/docker-manager/config.yaml:ro
+      - ./data:/data                    # SQLite (settings, history), pre-update backups
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/apps:/root/apps           # same path inside: compose resolves relative paths client-side
+      - /root/.docker:/root/.docker:ro  # registry credentials (docker login); buildx state goes to /tmp/buildx
+      - /proc:/host/proc:ro             # host CPU / RAM
+      - /sys/fs/cgroup:/host/cgroup:ro  # per-container CPU / RAM
+      - /etc/localtime:/etc/localtime:ro # cron schedules in the server's time zone

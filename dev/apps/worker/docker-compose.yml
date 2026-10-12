@@ -1,0 +1,7 @@
+# Fixture: a chatty worker writing to stdout and stderr, configured via .env.
+services:
+  worker:
+    image: busybox:1.36
+    command: ["sh", "-c", "i=0; while true; do i=$$((i+1)); echo \"tick $$i ($${GREETING})\"; [ $$((i % 5)) -eq 0 ] && echo \"warn: every fifth tick $$i\" >&2; sleep 2; done"]
+    environment:
+      GREETING: ${GREETING:-hello}

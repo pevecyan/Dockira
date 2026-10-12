@@ -1,0 +1,12 @@
+# /root/apps/docker-manager/config.yaml (chmod 600). Read at startup: restart after changes.
+listen: ":8080"
+apps_root: /root/apps
+data_dir: /data
+scan_depth: 3
+password_hash: ""        # docker run --rm -it docker-manager password
+secret_key: ""           # docker run --rm docker-manager gen-key   (keep it with your backups)
+public_url: ""           # e.g. https://docker.example.com once the reverse proxy is in place
+trusted_proxies: []      # e.g. [192.168.1.10] : the proxy's address (X-Forwarded-For is believed only from these)
+ip_allowlist: []         # optional CIDRs allowed to reach the UI at all
+read_only: false
+exec_enabled: false      # container shell in the UI

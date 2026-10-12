@@ -1,0 +1,12 @@
+# Fixture: a healthy web server with a healthcheck and a published port.
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    ports: ["18080:80"]
+    volumes:
+      - ./conf:/usr/share/nginx/html/conf:ro   # a bind folder (Backups tab)
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3

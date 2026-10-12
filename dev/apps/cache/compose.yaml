@@ -1,0 +1,10 @@
+# Fixture: a "database-like" service (auto-update opt-out by default) with a named volume
+# (Backups tab).
+name: cache
+services:
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+volumes:
+  redis-data:

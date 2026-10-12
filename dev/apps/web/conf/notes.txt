@@ -1,0 +1,1 @@
+Fixture: extra files next to a compose file (shown in the Files tab).

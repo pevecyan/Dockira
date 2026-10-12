@@ -1,0 +1,5 @@
+# Fixture: a locally built service one level deeper (like group/app).
+services:
+  app:
+    build: .
+    ports: ["18081:8000"]

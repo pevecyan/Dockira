@@ -1,0 +1,5 @@
+# Fixture: an image from the local test registry (make test-registry), for update/rollback tests.
+services:
+  demo:
+    image: localhost:5055/dm-demo:latest
+    restart: unless-stopped

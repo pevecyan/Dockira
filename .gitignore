@@ -1,0 +1,26 @@
+# secrets
+.env
+*.env.local
+!dev/apps/**/.env
+dev/config.yaml
+dev/*.sock
+
+# build output
+bin/
+web/dist/*
+!web/dist/.keep
+web/node_modules/
+web/src/api/openapi.json
+
+# local data
+*.db
+*.db-wal
+*.db-shm
+dev/data/
+.claude/
+dev/data-e2e/
+web/test-results/
+web/playwright-report/
+
+# private notes
+PLAN.md
