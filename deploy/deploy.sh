@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# Build docker-manager, ship the image over SSH and start (or upgrade) it on the server.
+# Install or upgrade Dockira on a server over SSH.
 #
-#   deploy/deploy.sh [user@host]          default: DM_HOST, else root@<host> from .env
+#   deploy/deploy.sh [user@host]          default: DM_HOST, else user@host from .env
+#
+# By default the server pulls the published image (ghcr.io/pevecyan/dockira:latest).
+# DM_BUILD=1 builds the image from this checkout instead and ships it over SSH (no registry);
+# the next run without DM_BUILD, or an update from the UI, goes back to the published image.
 #
 # First run on a server: creates /root/apps/docker-manager with compose.yaml and a config.yaml
 # holding a new secret key and the password from DM_PASSWORD (or a generated one, printed once).
@@ -15,29 +19,34 @@ fi
 HOST="${1:-${DM_HOST:?usage: deploy/deploy.sh user@host}}"
 KEY="${DM_SSH_KEY:-$HOME/.ssh/docker-manager_deploy_ed25519}"
 DIR="${DM_DIR:-/root/apps/docker-manager}"
-VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
+IMAGE="${DM_IMAGE:-ghcr.io/pevecyan/dockira}"
 SSH=(ssh -o BatchMode=yes -o ConnectTimeout=10)
 [[ -f "$KEY" ]] && SSH+=(-i "$KEY")
 remote() { "${SSH[@]}" "$HOST" "$@"; }
 
-echo "▸ building docker-manager:$VERSION"
-docker build -q -f deploy/Dockerfile --build-arg VERSION="$VERSION" -t "docker-manager:$VERSION" -t docker-manager:latest . >/dev/null
-
-echo "▸ copying the image to $HOST"
-docker save "docker-manager:$VERSION" | gzip -1 | remote 'gunzip | docker load -q'
-remote "docker tag docker-manager:$VERSION docker-manager:latest"
+if [[ "${DM_BUILD:-}" == 1 ]]; then
+  VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
+  echo "▸ building $IMAGE:$VERSION"
+  docker build -q -f deploy/Dockerfile --build-arg VERSION="$VERSION" -t "$IMAGE:$VERSION" -t "$IMAGE:latest" . >/dev/null
+  echo "▸ copying the image to $HOST"
+  docker save "$IMAGE:$VERSION" | gzip -1 | remote 'gunzip | docker load -q'
+  remote "docker tag $IMAGE:$VERSION $IMAGE:latest"
+else
+  echo "▸ pulling $IMAGE:latest on $HOST"
+  remote "docker pull -q $IMAGE:latest" >/dev/null
+fi
 
 remote "mkdir -p $DIR/data && chmod 700 $DIR"
 if [[ "${DM_UPDATE_COMPOSE:-}" == 1 ]] || ! remote "test -f $DIR/compose.yaml"; then
   echo "▸ writing $DIR/compose.yaml"
-  remote "cat > $DIR/compose.yaml" < deploy/compose.yaml
+  sed "s|ghcr.io/pevecyan/dockira:latest|$IMAGE:latest|" deploy/compose.yaml | remote "cat > $DIR/compose.yaml"
 fi
 
 if ! remote "test -f $DIR/config.yaml"; then
   echo "▸ first install: creating $DIR/config.yaml"
   PW="${DM_PASSWORD:-$(head -c 18 /dev/urandom | base64 | tr -d '/+=' | cut -c1-24)}"
-  HASH="$(printf '%s\n' "$PW" | remote "docker run --rm -i docker-manager:$VERSION password")"
-  SECRET="$(remote "docker run --rm docker-manager:$VERSION gen-key")"
+  HASH="$(printf '%s\n' "$PW" | remote "docker run --rm -i $IMAGE:latest password")"
+  SECRET="$(remote "docker run --rm $IMAGE:latest gen-key")"
   sed -e "s|^password_hash: \"\"|password_hash: \"$HASH\"|" -e "s|^secret_key: \"\"|secret_key: \"$SECRET\"|" deploy/config.example.yaml |
     remote "umask 077 && cat > $DIR/config.yaml"
   if [[ -z "${DM_PASSWORD:-}" ]]; then
@@ -55,9 +64,11 @@ for _ in $(seq 1 30); do
   status="$(remote "docker inspect -f '{{.State.Health.Status}}' docker-manager 2>/dev/null" || true)"
   if [[ "$status" == healthy ]]; then
     echo " ✓"
-    echo "  http://${HOST#*@}:8090  (docker-manager $VERSION)"
-    # drop older docker-manager tags (only ours; nothing else on the server is touched)
-    remote "docker images docker-manager --format '{{.Tag}}' | grep -vx -e latest -e '$VERSION' | sed 's/^/docker-manager:/' | xargs -r docker rmi -f >/dev/null 2>&1 || true"
+    echo "  http://${HOST#*@}:8090  (Dockira $(remote "docker exec docker-manager docker-manager version" 2>/dev/null || echo '?'))"
+    if [[ "${DM_BUILD:-}" == 1 ]]; then
+      # drop older local builds (only our image; nothing else on the server is touched)
+      remote "docker images $IMAGE --format '{{.Tag}}' | grep -vx -e latest -e '$VERSION' | sed 's|^|$IMAGE:|' | xargs -r docker rmi -f >/dev/null 2>&1 || true"
+    fi
     exit 0
   fi
   echo -n "."

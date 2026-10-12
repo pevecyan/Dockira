@@ -67,38 +67,37 @@ You keep your apps the way you already do: one folder per app, each with a `comp
 
 You need a Linux server (amd64) with Docker Engine and the compose v5 plugin, and your apps in folders under one directory. The examples use `/root/apps`.
 
-> The binary, image and container are called `docker-manager`. Dockira is the name of the project and the UI.
+The image is published as [`ghcr.io/pevecyan/dockira`](https://github.com/pevecyan/Dockira/pkgs/container/dockira) (`latest` and version tags such as `1.0.0`).
 
-### Option 1: build on the server
+> The binary and container are called `docker-manager`. Dockira is the name of the project, the image and the UI.
+
+### Option 1: on the server
+
+```sh
+mkdir -p /root/apps/docker-manager && chmod 700 /root/apps/docker-manager && cd /root/apps/docker-manager
+curl -fsSLO https://raw.githubusercontent.com/pevecyan/Dockira/main/deploy/compose.yaml
+curl -fsSL https://raw.githubusercontent.com/pevecyan/Dockira/main/deploy/config.example.yaml -o config.yaml && chmod 600 config.yaml
+
+docker run --rm -it ghcr.io/pevecyan/dockira password   # choose a password, prints its hash → password_hash
+docker run --rm ghcr.io/pevecyan/dockira gen-key        # prints a random key → secret_key
+nano config.yaml                                       # paste both values
+
+docker compose up -d
+```
+
+Open `http://<server>:8090` and sign in. Dockira lists its own stack too: when a new release is out it shows up under Updates, and it updates itself only when you click.
+
+### Option 2: from your machine over SSH
 
 ```sh
 git clone https://github.com/pevecyan/Dockira.git && cd Dockira
-docker build -f deploy/Dockerfile -t docker-manager .
-
-mkdir -p /root/apps/docker-manager && chmod 700 /root/apps/docker-manager
-cp deploy/compose.yaml /root/apps/docker-manager/
-install -m 600 deploy/config.example.yaml /root/apps/docker-manager/config.yaml
-
-docker run --rm -it docker-manager password   # choose a password, prints its hash → password_hash
-docker run --rm docker-manager gen-key        # prints a random key → secret_key
-nano /root/apps/docker-manager/config.yaml    # paste both values
-
-cd /root/apps/docker-manager && docker compose up -d
-```
-
-Open `http://<server>:8090` and sign in.
-
-### Option 2: deploy from your machine over SSH
-
-```sh
 deploy/deploy.sh root@your-server        # or put host= and user= in .env (see .env.example)
 ```
 
 The script:
-1. builds the image locally
-2. copies it over SSH (`docker save | docker load`, no registry needed)
-3. on the first run, creates `/root/apps/docker-manager/` with `compose.yaml` and a `config.yaml` holding a new `secret_key` and the password from `DM_PASSWORD` (or a generated one, printed once)
-4. starts the stack and waits until it's healthy
+1. pulls `ghcr.io/pevecyan/dockira:latest` on the server (with `DM_BUILD=1` it builds the image from your checkout instead and copies it over SSH, no registry needed)
+2. on the first run, creates `/root/apps/docker-manager/` with `compose.yaml` and a `config.yaml` holding a new `secret_key` and the password from `DM_PASSWORD` (or a generated one, printed once)
+3. starts the stack and waits until it's healthy
 
 Running it again upgrades the image and keeps the config and data. `DM_UPDATE_COMPOSE=1` also replaces `compose.yaml`. Use `DM_SSH_KEY` to choose an SSH key and `DM_DIR` to install somewhere else.
 
@@ -128,8 +127,8 @@ The proxy must:
 | `apps_root` | `/root/apps` | mounted at the same path in the container, because compose resolves relative paths on the client |
 | `scan_depth` | `3` | how deep to look for stack folders |
 | `data_dir` | `/data` | SQLite database, backups and snapshots |
-| `password_hash` | – | `docker run --rm -it docker-manager password` (bcrypt) |
-| `secret_key` | – | `docker run --rm docker-manager gen-key`. Signs sessions and encrypts channel secrets and file history. **Back it up with `data/`.** |
+| `password_hash` | – | `docker run --rm -it ghcr.io/pevecyan/dockira password` (bcrypt) |
+| `secret_key` | – | `docker run --rm ghcr.io/pevecyan/dockira gen-key`. Signs sessions and encrypts channel secrets and file history. **Back it up with `data/`.** |
 | `public_url` | – | your HTTPS address behind a reverse proxy |
 | `trusted_proxies` | `[]` | IPs/CIDRs of your reverse proxy |
 | `ip_allowlist` | `[]` | if set, only these addresses reach the UI |

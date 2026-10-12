@@ -1,7 +1,7 @@
-# docker-manager on the server: /root/apps/docker-manager/compose.yaml (deploy/deploy.sh puts it there).
+# Dockira on the server: /root/apps/docker-manager/compose.yaml (deploy/deploy.sh puts it there).
 services:
   docker-manager:
-    image: docker-manager:latest
+    image: ghcr.io/pevecyan/dockira:latest
     container_name: docker-manager
     restart: unless-stopped
     ports:

@@ -1,0 +1,18 @@
+# Only what deploy/Dockerfile needs: keep local secrets, data and build output out of the context.
+.git
+.github
+.claude
+.env
+*.env.local
+PLAN.md
+bin/
+dev/
+docs/
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+web/e2e/
+*.db
+*.db-wal
+*.db-shm

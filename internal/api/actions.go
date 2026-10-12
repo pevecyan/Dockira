@@ -210,6 +210,10 @@ func (s *Server) ComposeJob(st stacks.Stack, action string, services []string, t
 	case "rebuild":
 		steps = [][]string{append([]string{"build", "--pull"}, services...), append([]string{"up", "-d"}, services...)}
 	}
+	if action == "update" && st.Self {
+		// pull here, then let a helper replace our container (no rollback: we'd be gone by then)
+		return s.selfSpec(st, spec, steps...)
+	}
 	if action == "update" && s.Updates != nil {
 		return s.Updates.UpdateSpec(st, services, trigger, spec)
 	}
@@ -245,11 +249,19 @@ func (s *Server) ComposeJob(st stacks.Stack, action string, services []string, t
 	return spec, nil
 }
 
-// selfSpec runs a compose command on docker-manager's own stack from a short-lived helper
-// container (the same image, which has the compose CLI): recreating our own container would
-// otherwise kill the process running compose halfway.
-func (s *Server) selfSpec(st stacks.Stack, spec jobs.Spec, args []string) (jobs.Spec, error) {
+// selfSpec runs compose commands on docker-manager's own stack. The last one runs from a
+// short-lived helper container (the same image, which has the compose CLI): recreating our own
+// container would otherwise kill the process running compose halfway. Earlier ones (a pull)
+// don't touch the container and run here.
+func (s *Server) selfSpec(st stacks.Stack, spec jobs.Spec, steps ...[]string) (jobs.Spec, error) {
+	pre, args := steps[:len(steps)-1], steps[len(steps)-1]
 	spec.Run = func(ctx context.Context, out *jobs.Output) error {
+		for _, a := range pre {
+			out.Printf("▸ docker compose %s", strings.Join(a, " "))
+			if err := out.Exec(s.Compose.Cmd(ctx, st.Dir, st.Files, a...)); err != nil {
+				return err
+			}
+		}
 		self := ""
 		for _, sv := range st.Services {
 			for _, c := range sv.Containers {
